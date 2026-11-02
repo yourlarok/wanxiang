@@ -7,7 +7,7 @@ class VisualizationRequest(BaseModel):
     text: str | None = Field(default=None, max_length=20_000)
     image_base64: str | None = Field(default=None, max_length=20_000_000)
     preference: Literal["auto", "concept", "process", "formula", "interactive"] = "auto"
-    style: Literal["textbook", "blueprint", "minimal", "chalk"] = "textbook"
+    style: Literal["textbook", "blueprint", "minimal", "chalk", "anime", "newspaper", "pixel", "watercolor"] = "textbook"
 
     @model_validator(mode="after")
     def require_content(self):
@@ -64,7 +64,7 @@ class Artifact(BaseModel):
     artifact_type: Literal["html", "graph", "formula"]
     title: str = Field(min_length=1, max_length=160)
     explanation: str = Field(min_length=1, max_length=2_000)
-    style: Literal["textbook", "blueprint", "minimal", "chalk"] = "textbook"
+    style: Literal["textbook", "blueprint", "minimal", "chalk", "anime", "newspaper", "pixel", "watercolor"] = "textbook"
     html: HtmlPayload | None = None
     graph: GraphPayload | None = None
     formula: FormulaPayload | None = None

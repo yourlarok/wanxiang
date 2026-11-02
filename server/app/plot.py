@@ -238,21 +238,28 @@ def _style_axis(ax, panel: PlotPanel, is_3d: bool, style: dict[str, str]) -> Non
 
 def render_plot(spec: PlotSpec, style_name: str = "textbook") -> str:
     style = style_guide(style_name)
-    figure = plt.figure(
-        figsize=(spec.width, spec.height), dpi=spec.dpi, facecolor=style["background"], layout="constrained",
-    )
-    try:
-        for index, panel in enumerate(spec.panels):
-            is_3d = panel.projection == "3d" or (panel.projection == "auto" and any(series.is_3d for series in panel.series))
-            ax = figure.add_subplot(spec.rows, spec.columns, index + 1, projection="3d" if is_3d else None)
-            ax.set_facecolor(style["background"])
-            for series in panel.series:
-                _draw_series(ax, series, is_3d, style)
-            _style_axis(ax, panel, is_3d, style)
-        output = StringIO()
-        figure.savefig(output, format="svg", dpi=spec.dpi, facecolor=style["background"], bbox_inches="tight", pad_inches=0.2)
-        svg = output.getvalue()
-        svg = svg[svg.index("<svg"):]
-        return re.sub(r'(<svg\b[^>]*?)width="[^"]+"\s+height="[^"]+"', r'\1width="100%"', svg, count=1)
-    finally:
-        plt.close(figure)
+    family = style["plot_family"]
+    fallback = {"serif": "DejaVu Serif", "monospace": "DejaVu Sans Mono"}.get(family, "DejaVu Sans")
+    font_context = {
+        "font.family": family,
+        f"font.{family}": [*style["plot_fonts"].split(","), fallback],
+    }
+    with matplotlib.rc_context(font_context):
+        figure = plt.figure(
+            figsize=(spec.width, spec.height), dpi=spec.dpi, facecolor=style["background"], layout="constrained",
+        )
+        try:
+            for index, panel in enumerate(spec.panels):
+                is_3d = panel.projection == "3d" or (panel.projection == "auto" and any(series.is_3d for series in panel.series))
+                ax = figure.add_subplot(spec.rows, spec.columns, index + 1, projection="3d" if is_3d else None)
+                ax.set_facecolor(style["background"])
+                for series in panel.series:
+                    _draw_series(ax, series, is_3d, style)
+                _style_axis(ax, panel, is_3d, style)
+            output = StringIO()
+            figure.savefig(output, format="svg", dpi=spec.dpi, facecolor=style["background"], bbox_inches="tight", pad_inches=0.2)
+            svg = output.getvalue()
+            svg = svg[svg.index("<svg"):]
+            return re.sub(r'(<svg\b[^>]*?)width="[^"]+"\s+height="[^"]+"', r'\1width="100%"', svg, count=1)
+        finally:
+            plt.close(figure)

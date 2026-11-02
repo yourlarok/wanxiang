@@ -36,7 +36,7 @@ def openai_tool(name: str, description: str, properties: dict[str, Any], require
 COMMON = {
     "title": {"type": "string", "description": "不超过30字的标题"},
     "explanation": {"type": "string", "description": "简明扼要、直接帮助理解的解释"},
-    "style": {"type": "string", "enum": ["textbook", "blueprint", "minimal", "chalk"]},
+    "style": {"type": "string", "enum": ["textbook", "blueprint", "minimal", "chalk", "anime", "newspaper", "pixel", "watercolor"]},
     "evidence": {"type": "array", "items": {"type": "string"}, "description": "与原文对应的依据"},
 }
 

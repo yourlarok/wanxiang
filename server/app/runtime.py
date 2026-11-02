@@ -30,6 +30,7 @@ FAST_SYSTEM_PROMPT = """
 规则三维网格用 voxels：shape 给三个维度，coordinates 只给非默认单元，colors 配合 color_by 表达维度差异；不要逐图元摆平面矩形。
 简单自定义示意才用 create_scene_artifact；真正的实体关系或流程用 create_graph_artifact；纯公式解释用 create_formula_artifact。
 同一问题的对比子图必须保持一致的图形类型、视角和视觉编码；3–4 个面板默认使用 2×2 均衡布局，不要横向挤成一排。
+颜色优先使用 accent、highlight、ink、muted 等语义色，使用户选择的主题统一生效。
 标签简短且准确，只输出回答问题所需的数据与视觉结构。
 """.strip()
 

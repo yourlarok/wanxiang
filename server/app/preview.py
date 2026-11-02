@@ -8,7 +8,7 @@ PREVIEW_HTML = """<!doctype html>
 <main><section class="input"><h1>让概念变得可见</h1><p>输入一个问题，万相会自主选择合适的可视化工具和表达形式。</p>
 <label for="source">文本或问题</label><textarea id="source">张量形状为(2,3)，分别说明 axis=0、1、2 插入维度是什么意思</textarea>
 <label for="preference">表达偏好</label><select id="preference"><option value="auto">智能选择</option><option value="interactive">交互解释</option><option value="process">流程关系</option><option value="concept">概念关系</option><option value="formula">公式</option></select>
-<label for="style">视觉风格</label><select id="style"><option value="textbook">教材风</option><option value="blueprint">蓝图风</option><option value="minimal">极简风</option><option value="chalk">黑板风</option></select>
+<label for="style">视觉风格</label><select id="style"><option value="anime">动漫风</option><option value="newspaper">报刊风</option><option value="watercolor">水彩风</option><option value="pixel">像素风</option><option value="textbook">教材风</option><option value="blueprint">蓝图风</option><option value="minimal">极简风</option><option value="chalk">黑板风</option></select>
 <button class="generate" id="generate">生成可视化</button><p id="status"></p></section>
 <section class="output"><div class="output-header"><h2 id="title">可视化画布</h2><span id="engine"></span></div><div class="explanation" id="explanation">结果会显示在这里</div><div class="stage" id="stage"><div class="empty">输入内容并点击“生成可视化”<br>开放 HTML 产物中的按钮和滑块也可以直接操作</div></div></section>
 </main><script>

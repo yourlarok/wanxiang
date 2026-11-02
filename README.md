@@ -45,9 +45,9 @@ NVM 只负责管理 Node.js 版本；服务启动使用 `npx`。
 ### 1. 配置模型
 
 ```bash
-export VIS_AGENT_BASE_URL=https://api.kimi.com/coding/v1
+export VIS_AGENT_BASE_URL=https://api.deepseek.com/v1
 export VIS_AGENT_API_KEY=你的密钥
-export VIS_AGENT_MODEL=k3.1-pro
+export VIS_AGENT_MODEL=deepseek-flash
 export VIS_AGENT_REASONING_EFFORT=low
 ```
 
@@ -84,7 +84,7 @@ npx -y github:yourlarok/wanxiang doctor
 默认快速路径只进行一次模型规划，并使用本地 SVG 渲染，不削减视觉模板和布局质量：
 
 ```bash
-export VIS_AGENT_MODEL=k3.1-pro-highspeed
+export VIS_AGENT_MODEL=deepseek-flash
 export VIS_PLANNER_REASONING_EFFORT=low
 export VIS_FAST_MODE=true
 ```
@@ -93,7 +93,7 @@ export VIS_FAST_MODE=true
 
 ```bash
 export VIS_JEV_ENABLED=true
-export VIS_JEV_MODEL=k3.1-pro-highspeed
+export VIS_JEV_MODEL=deepseek-flash
 export VIS_JEV_REVIEW_MODE=uncertain
 export VIS_JEV_THRESHOLD=0.72
 ```

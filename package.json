@@ -1,0 +1,25 @@
+{
+  "name": "@yourlarok/wanxiang",
+  "version": "0.2.0",
+  "description": "万相：由 Agent 驱动的开放式可视化后台服务",
+  "type": "module",
+  "bin": {
+    "wanxiang": "bin/wanxiang.mjs"
+  },
+  "scripts": {
+    "start": "node bin/wanxiang.mjs start",
+    "mcp": "node bin/wanxiang.mjs mcp",
+    "doctor": "node bin/wanxiang.mjs doctor"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "bin/",
+    "server/app/",
+    "server/requirements.txt",
+    ".env.example",
+    "README.md"
+  ],
+  "license": "MIT"
+}

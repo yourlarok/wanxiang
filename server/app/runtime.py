@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import time
 from html import escape
 from typing import Any
 
@@ -15,6 +16,7 @@ from .verifier import verify_artifact
 SYSTEM_PROMPT = """
 你是开放式可视化 Agent，不是场景分类器。你的任务是直接帮助用户理解问题。
 优先创建能直观解释的微场景、模拟、几何图、函数图或交互实验；只有真正的关系或流程才用关系图。
+数据、函数、空间结构和三维内容优先调用 create_plot_artifact，用声明式 PlotSpec 交给专业渲染器，不手写绘图代码。
 必须调用一个 create_*_artifact 工具完成产物，不要只输出文字回答。
 可先调用 get_style_guide 或外部 MCP 工具获取设计/计算能力，再创建产物。
 create_html_artifact 支持任意内联 HTML、SVG、CSS 和本地 JavaScript，因此未知领域也应自然生成，不得退回概念分类。
@@ -23,10 +25,12 @@ HTML 不引用外部库、图片或字体，不使用 script/iframe/事件属性
 """.strip()
 
 FAST_SYSTEM_PROMPT = """
-你是快速可视化规划器。只进行一次工具调用，直接创建紧凑场景，不查询风格或外部工具。
-优先 create_scene_artifact：用少量 text、rect、grid、circle、line、arrow 表达直觉，由本地渲染为 SVG。
-画布建议 900×520，元素不得重叠，标签简短。不要生成长篇 HTML，不要解释工具过程。
-真正的实体关系或流程才用 create_graph_artifact；纯公式解释才用 create_formula_artifact。
+你是快速可视化规划器。只进行一次工具调用，不查询风格或外部工具，不解释工具过程。
+数据、函数、几何、矩阵、张量、空间结构优先 create_plot_artifact，以紧凑声明式 PlotSpec 描述数据、视觉编码和多子图布局，由本地 Matplotlib 专业渲染。
+规则三维网格用 voxels：shape 给三个维度，coordinates 只给非默认单元，colors 配合 color_by 表达维度差异；不要逐图元摆平面矩形。
+简单自定义示意才用 create_scene_artifact；真正的实体关系或流程用 create_graph_artifact；纯公式解释用 create_formula_artifact。
+同一问题的对比子图必须保持一致的图形类型、视角和视觉编码；3–4 个面板默认使用 2×2 均衡布局，不要横向挤成一排。
+标签简短且准确，只输出回答问题所需的数据与视觉结构。
 """.strip()
 
 
@@ -96,6 +100,8 @@ class VisualRuntime:
         return verify_artifact(artifact)
 
     async def _model_artifact(self, request: VisualizationRequest) -> Artifact:
+        started = time.perf_counter()
+        model_ms = 0.0
         content: list[dict[str, Any]] = [{
             "type": "text",
             "text": f"表达偏好：{request.preference}\n视觉风格：{request.style}\n用户内容：{request.text or '识别截图并选择最有助于理解的视觉表达'}",
@@ -109,11 +115,11 @@ class VisualRuntime:
             {"role": "system", "content": FAST_SYSTEM_PROMPT if self.fast_mode else SYSTEM_PROMPT},
             {"role": "user", "content": content},
         ]
-        tools = await self.registry.tools()
+        tools = self.registry.builtin_tools() if self.fast_mode else await self.registry.tools()
         if self.fast_mode:
             tools = [
                 tool for tool in tools
-                if tool["function"]["name"] in {"create_scene_artifact", "create_graph_artifact", "create_formula_artifact"}
+                if tool["function"]["name"] in {"create_plot_artifact", "create_scene_artifact", "create_graph_artifact", "create_formula_artifact"}
             ]
 
         async with httpx.AsyncClient(timeout=120) as client:
@@ -126,11 +132,13 @@ class VisualRuntime:
                     "max_completion_tokens": 2500 if self.fast_mode else 7000,
                     "reasoning_effort": self.planner_reasoning_effort if self.fast_mode else self.reasoning_effort,
                 }
+                model_started = time.perf_counter()
                 response = await client.post(
                     f"{self.base_url}/chat/completions",
                     headers={"Authorization": f"Bearer {self.api_key}"},
                     json=payload,
                 )
+                model_ms += (time.perf_counter() - model_started) * 1000
                 if response.is_error:
                     raise RuntimeErrorBase(f"模型服务返回 HTTP {response.status_code}")
                 data = response.json()
@@ -147,6 +155,8 @@ class VisualRuntime:
                         arguments = json.loads(function.get("arguments") or "{}")
                         result = await self.registry.call(function["name"], arguments)
                         if result.artifact:
+                            result.artifact.timings_ms["model"] = model_ms
+                            result.artifact.timings_ms["total"] = (time.perf_counter() - started) * 1000
                             return result.artifact
                         tool_content = result.content
                     except (ValueError, KeyError, TypeError) as error:

@@ -1,12 +1,13 @@
 # 万相 Wanxiang
 
-万相是一个由 Agent 驱动的开放式可视化后台服务。它把文本或截图转换为可交互的教学微场景、SVG/HTML 视觉解释、专业关系图或公式产物。
+万相是一个由 Agent 驱动的开放式可视化后台服务。它把文本或截图转换为专业数据图、三维教学图、可交互微场景、SVG/HTML 视觉解释、关系图或公式产物。
 
-万相不是桌面 App，也不依赖固定场景模板。通用大模型负责理解问题和选择工具，MCP 工具负责提供专业能力，Verifier 负责协议与安全校验。
+万相不是桌面 App，也不依赖固定知识模板。通用大模型负责理解问题并生成紧凑的声明式 VizSpec，Matplotlib 等专业工具负责确定性渲染，MCP 提供扩展能力，Verifier 负责协议与安全校验。
 
 ## 核心特点
 
-- **开放产物**：支持 HTML、内联 SVG、CSS 和本地 JavaScript，不受固定图表类型限制。
+- **声明式专业图表**：通用 PlotSpec 支持折线、散点、柱状、三维柱体、体素网格、曲面和最多 16 个子图；模型只提供数据与视觉编码，不提交可执行代码。
+- **开放产物**：支持 HTML、内联 SVG、CSS 和本地 JavaScript，不受固定知识领域限制。
 - **Agent 工具循环**：模型可以按需获取风格指南、调用外部 MCP 工具，再创建视觉产物。
 - **MCP 可扩展**：通过 `VIS_MCP_SERVERS` 动态发现其他 MCP 服务。
 - **风格与语义分离**：内置 textbook、blueprint、minimal、chalk 四套视觉风格。
@@ -19,18 +20,18 @@
 ```text
 文本 / 截图
     ↓
-理解问题与教学意图
+理解问题与教学意图，选择专业工具
     ↓
-发现并按需调用可视化 MCP 工具
+生成声明式 PlotSpec / SceneSpec，或按需调用 MCP
     ↓
-生成开放 HTML / 关系图 / 公式 Artifact
+Matplotlib / SVG / HTML 确定性渲染
     ↓
 协议、安全和完整性校验
     ↓
-返回可渲染的 Artifact JSON
+返回可渲染的 Artifact JSON 与分阶段耗时
 ```
 
-万相不会把所有内容都转成关系图。几何模拟、嵌套结构、函数图像、交互实验和自定义 SVG 都可以由 Agent 自然生成。
+万相不会把所有内容都转成关系图。函数图像、三维结构、几何模拟、嵌套结构、交互实验和自定义 SVG 都可以由 Agent 自然生成。
 
 ## 环境要求
 
@@ -77,11 +78,11 @@ npx -y github:yourlarok/wanxiang doctor
 
 ### 3. 打开可视化预览
 
-启动后访问 `http://127.0.0.1:8765/preview`。页面支持文本输入、风格选择和生成耗时显示，开放 HTML 中的按钮与滑块可以直接操作。
+启动后访问 `http://127.0.0.1:8765/preview`。页面支持文本输入、风格选择以及模型、渲染和总耗时显示，开放 HTML 中的按钮与滑块可以直接操作。
 
 ### 4. 速度与 JEV 配置
 
-默认快速路径只进行一次模型规划，并使用本地 SVG 渲染，不削减视觉模板和布局质量：
+默认快速路径只进行一次低强度模型规划，跳过外部 MCP 发现，并使用预热的本地 Matplotlib/SVG 渲染。数据与空间图形优先生成 PlotSpec，简单示意才使用六图元 SceneSpec：
 
 ```bash
 export VIS_AGENT_MODEL=deepseek-flash
@@ -98,7 +99,7 @@ export VIS_JEV_REVIEW_MODE=uncertain
 export VIS_JEV_THRESHOLD=0.72
 ```
 
-高置信结果直接返回，低置信结果才升级完整 Agent。缓存命中时通常毫秒级返回；首次复杂生成的速度仍取决于远程规划模型。
+高置信结果直接返回，低置信结果才升级完整 Agent。缓存命中时通常毫秒级返回；首次生成的速度仍主要取决于远程规划模型。Artifact 的 `timings_ms` 分别记录 `model`、`render` 和 `total`，用于区分推理与本地渲染瓶颈。
 
 ### 5. 调用 HTTP API
 
@@ -200,6 +201,7 @@ export VIS_MCP_SERVERS='[{"name":"generative-ui","command":"npx","args":["-y","g
 - HTML 不允许 `script`、`iframe`、外部资源和内联事件。
 - CSS 不允许 `@import`、`url()` 和表达式。
 - JavaScript 不允许网络、存储、动态执行、访问宿主页面。
+- PlotSpec 只接受经过 Pydantic 校验的声明式数据，禁止额外代码字段，并限制数据量、面板数和三维网格规模；不会执行模型生成的 Python。
 - 产物必须包含简明解释，关系图必须验证节点与边引用。
 - 模型密钥只从环境变量或本地 `.env` 读取，不写入 Artifact。
 

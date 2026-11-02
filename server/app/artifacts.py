@@ -72,6 +72,7 @@ class Artifact(BaseModel):
     engine: str
     tool: str
     verification: Verification
+    timings_ms: dict[str, float] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_payload(self):

@@ -10,6 +10,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from .artifacts import Artifact, FormulaPayload, GraphPayload, HtmlPayload, Verification
+from .plot import PlotSpec, render_plot
 from .scene import SceneSpec, render_scene
 from .styles import style_guide
 from .verifier import verify_artifact
@@ -59,7 +60,18 @@ class ToolRegistry:
         scene_schema = SceneSpec.model_json_schema()
         scene_schema["properties"]["elements"]["items"] = scene_schema["$defs"].pop("SceneElement")
         scene_schema.pop("$defs")
+        plot_schema = PlotSpec.model_json_schema()
+        panel_schema = plot_schema["$defs"].pop("PlotPanel")
+        panel_schema["properties"]["series"]["items"] = plot_schema["$defs"].pop("PlotSeries")
+        plot_schema["properties"]["panels"]["items"] = panel_schema
+        plot_schema.pop("$defs")
         return [
+            openai_tool(
+                "create_plot_artifact",
+                "用声明式 PlotSpec 创建专业数据图、函数图、空间结构和三维模拟。支持 line、scatter、bar、bar3d、voxels、surface 及多子图；本地 Matplotlib 确定性渲染。张量、矩阵、体积网格优先使用 voxels，坐标与视觉编码由数据决定，不要退化为平面卡片。",
+                {**COMMON, "plot": plot_schema},
+                ["title", "explanation", "style", "plot", "evidence"],
+            ),
             openai_tool(
                 "create_scene_artifact",
                 "以紧凑场景元素计划快速生成 SVG。模型只需给出文字、矩形、网格、圆、线和箭头及坐标，本地完成渲染。适合教学示意、结构嵌套、几何、流程直觉和函数草图。",
@@ -139,6 +151,27 @@ class ToolRegistry:
         self.discovered_at = time.monotonic()
 
     async def call(self, name: str, arguments: dict[str, Any]) -> ToolResult:
+        if name == "create_plot_artifact":
+            started = time.perf_counter()
+            plot = PlotSpec.model_validate(arguments["plot"])
+            artifact = Artifact(
+                artifact_type="html",
+                title=arguments["title"],
+                explanation=arguments["explanation"],
+                style=arguments["style"],
+                html=HtmlPayload(
+                    body=f'<div class="plot">{render_plot(plot, arguments["style"])}</div>',
+                    css=".plot{width:100%;overflow:hidden}.plot svg{display:block;max-width:100%;height:auto;margin:auto}",
+                    javascript="",
+                ),
+                evidence=arguments.get("evidence", []),
+                engine=self.engine,
+                tool=name,
+                verification=Verification(passed=False),
+            )
+            artifact = verify_artifact(artifact)
+            artifact.timings_ms["render"] = (time.perf_counter() - started) * 1000
+            return ToolResult("声明式 PlotSpec 已由 Matplotlib 渲染并通过校验", artifact)
         if name == "create_scene_artifact":
             scene = SceneSpec.model_validate(arguments["scene"])
             artifact = Artifact(

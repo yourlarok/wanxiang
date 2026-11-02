@@ -75,7 +75,32 @@ npx -y github:yourlarok/wanxiang start --port 9000
 npx -y github:yourlarok/wanxiang doctor
 ```
 
-### 3. 调用 HTTP API
+### 3. 打开可视化预览
+
+启动后访问 `http://127.0.0.1:8765/preview`。页面支持文本输入、风格选择和生成耗时显示，开放 HTML 中的按钮与滑块可以直接操作。
+
+### 4. 速度与 JEV 配置
+
+默认快速路径只进行一次模型规划，并使用本地 SVG 渲染，不削减视觉模板和布局质量：
+
+```bash
+export VIS_AGENT_MODEL=k3.1-pro-highspeed
+export VIS_PLANNER_REASONING_EFFORT=low
+export VIS_FAST_MODE=true
+```
+
+完整开放 Agent/MCP 模式可设置 `VIS_FAST_MODE=false`。JEV 默认不参与每次请求；启用后只对开放 HTML、证据不足或校验异常结果进行评审：
+
+```bash
+export VIS_JEV_ENABLED=true
+export VIS_JEV_MODEL=k3.1-pro-highspeed
+export VIS_JEV_REVIEW_MODE=uncertain
+export VIS_JEV_THRESHOLD=0.72
+```
+
+高置信结果直接返回，低置信结果才升级完整 Agent。缓存命中时通常毫秒级返回；首次复杂生成的速度仍取决于远程规划模型。
+
+### 5. 调用 HTTP API
 
 ```bash
 curl http://127.0.0.1:8765/health

@@ -10,6 +10,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from .artifacts import Artifact, FormulaPayload, GraphPayload, HtmlPayload, Verification
+from .scene import SceneSpec, render_scene
 from .styles import style_guide
 from .verifier import verify_artifact
 
@@ -55,7 +56,16 @@ class ToolRegistry:
             return []
 
     def builtin_tools(self) -> list[dict[str, Any]]:
+        scene_schema = SceneSpec.model_json_schema()
+        scene_schema["properties"]["elements"]["items"] = scene_schema["$defs"].pop("SceneElement")
+        scene_schema.pop("$defs")
         return [
+            openai_tool(
+                "create_scene_artifact",
+                "以紧凑场景元素计划快速生成 SVG。模型只需给出文字、矩形、网格、圆、线和箭头及坐标，本地完成渲染。适合教学示意、结构嵌套、几何、流程直觉和函数草图。",
+                {**COMMON, "scene": scene_schema},
+                ["title", "explanation", "style", "scene", "evidence"],
+            ),
             openai_tool(
                 "get_style_guide",
                 "按视觉风格获取设计令牌和表达指南。需要创建视觉产物时可按需调用。",
@@ -129,6 +139,20 @@ class ToolRegistry:
         self.discovered_at = time.monotonic()
 
     async def call(self, name: str, arguments: dict[str, Any]) -> ToolResult:
+        if name == "create_scene_artifact":
+            scene = SceneSpec.model_validate(arguments["scene"])
+            artifact = Artifact(
+                artifact_type="html",
+                title=arguments["title"],
+                explanation=arguments["explanation"],
+                style=arguments["style"],
+                html=HtmlPayload(body=render_scene(scene), css=".scene{display:block;width:100%;height:auto}", javascript=""),
+                evidence=arguments.get("evidence", []),
+                engine=self.engine,
+                tool=name,
+                verification=Verification(passed=False),
+            )
+            return ToolResult("紧凑场景已渲染为 SVG 并通过校验", verify_artifact(artifact))
         if name == "get_style_guide":
             return ToolResult(json.dumps(style_guide(arguments["style"]), ensure_ascii=False))
         if name == "create_html_artifact":

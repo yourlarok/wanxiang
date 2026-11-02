@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 
 from .artifacts import Artifact, HtmlPayload, Verification, VisualizationRequest
+from .decision import JevEngine
 from .tools import ToolRegistry
 from .verifier import verify_artifact
 
@@ -21,6 +22,13 @@ HTML 不引用外部库、图片或字体，不使用 script/iframe/事件属性
 图形要直接回答用户疑问，文字简明，避免把段落塞进节点。evidence 只记录原文依据，不编造事实。
 """.strip()
 
+FAST_SYSTEM_PROMPT = """
+你是快速可视化规划器。只进行一次工具调用，直接创建紧凑场景，不查询风格或外部工具。
+优先 create_scene_artifact：用少量 text、rect、grid、circle、line、arrow 表达直觉，由本地渲染为 SVG。
+画布建议 900×520，元素不得重叠，标签简短。不要生成长篇 HTML，不要解释工具过程。
+真正的实体关系或流程才用 create_graph_artifact；纯公式解释才用 create_formula_artifact。
+""".strip()
+
 
 class RuntimeErrorBase(RuntimeError):
     pass
@@ -32,7 +40,10 @@ class VisualRuntime:
         self.api_key = os.getenv("VIS_AGENT_API_KEY", "")
         self.model = os.getenv("VIS_AGENT_MODEL", "")
         self.reasoning_effort = os.getenv("VIS_AGENT_REASONING_EFFORT", "low")
+        self.planner_reasoning_effort = os.getenv("VIS_PLANNER_REASONING_EFFORT", "low")
+        self.fast_mode = os.getenv("VIS_FAST_MODE", "true").lower() != "false"
         self.registry = ToolRegistry(f"model:{self.model}" if self.model else "local-open-html")
+        self.jev = JevEngine()
         self.cache: dict[str, Artifact] = {}
 
     @property
@@ -47,6 +58,18 @@ class VisualRuntime:
             artifact = self._local_artifact(request)
         else:
             artifact = await self._model_artifact(request)
+            if self.fast_mode and self.jev.should_review(artifact):
+                decision = await self.jev.review(request, artifact)
+                artifact.verification.checks.append(
+                    f"JEV {decision.action}，置信度 {decision.confidence:.2f}，{decision.elapsed_ms:.0f}ms"
+                )
+                if decision.action == "escalate":
+                    self.fast_mode = False
+                    try:
+                        artifact = await self._model_artifact(request)
+                        artifact.verification.checks.append("低置信结果已升级至完整 Agent")
+                    finally:
+                        self.fast_mode = True
         if len(self.cache) >= 64:
             self.cache.pop(next(iter(self.cache)))
         self.cache[key] = artifact
@@ -83,10 +106,15 @@ class VisualRuntime:
                 image = f"data:image/png;base64,{image}"
             content.append({"type": "image_url", "image_url": {"url": image}})
         messages: list[dict[str, Any]] = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": FAST_SYSTEM_PROMPT if self.fast_mode else SYSTEM_PROMPT},
             {"role": "user", "content": content},
         ]
         tools = await self.registry.tools()
+        if self.fast_mode:
+            tools = [
+                tool for tool in tools
+                if tool["function"]["name"] in {"create_scene_artifact", "create_graph_artifact", "create_formula_artifact"}
+            ]
 
         async with httpx.AsyncClient(timeout=120) as client:
             for _ in range(5):
@@ -95,8 +123,8 @@ class VisualRuntime:
                     "messages": messages,
                     "tools": tools,
                     "tool_choice": "auto",
-                    "max_completion_tokens": 7000,
-                    "reasoning_effort": self.reasoning_effort,
+                    "max_completion_tokens": 2500 if self.fast_mode else 7000,
+                    "reasoning_effort": self.planner_reasoning_effort if self.fast_mode else self.reasoning_effort,
                 }
                 response = await client.post(
                     f"{self.base_url}/chat/completions",

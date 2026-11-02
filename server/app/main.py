@@ -1,3 +1,5 @@
+import logging
+import time
 from pathlib import Path
 
 import httpx
@@ -5,11 +7,13 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import ValidationError
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 from .artifacts import Artifact, VisualizationRequest
+from .preview import PREVIEW_HTML
 from .runtime import RuntimeErrorBase, VisualRuntime
 
 app = FastAPI(title="万相 Wanxiang", version="0.2.0")
@@ -20,6 +24,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 runtime = VisualRuntime()
+logger = logging.getLogger("wanxiang")
+
+
+@app.middleware("http")
+async def measure_duration(request, call_next):
+    started = time.perf_counter()
+    response = await call_next(request)
+    elapsed_ms = (time.perf_counter() - started) * 1000
+    response.headers["X-Process-Time-Ms"] = f"{elapsed_ms:.0f}"
+    logger.info("%s %s completed in %.2fs", request.method, request.url.path, elapsed_ms / 1000)
+    return response
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/preview", response_class=HTMLResponse, include_in_schema=False)
+def preview():
+    return PREVIEW_HTML
 
 
 @app.get("/health")

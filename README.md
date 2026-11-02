@@ -203,7 +203,7 @@ uvicorn app.main:app --host 127.0.0.1 --port 8765
 ## 当前限制
 
 - 复杂开放 HTML 的首次生成可能需要较长时间，取决于模型和工具调用次数。
-- Windows 与 macOS 启动器通过 CI 检查，但不同企业安全策略仍可能影响 MCP 子进程。
+- 启动器按 Windows 与 macOS 设计；不同企业安全策略仍可能影响 MCP 子进程。
 - 外部 MCP 工具的质量、权限和可用性由各服务自身决定。
 
 ## License

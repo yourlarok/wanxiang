@@ -79,7 +79,7 @@ function launch(args, withCompanion = false) {
 }
 
 function help() {
-  console.log(`万相 Wanxiang · 陪伴学习与开放式可视化 Agent 服务\n\n用法：\n  wanxiang start [--port 8765]       启动 HTTP 服务\n  wanxiang companion [--port 8765]  启动右键框选与毛玻璃学习浮层\n  wanxiang companion --check        检查屏幕与输入权限\n  wanxiang mcp                      通过 stdio MCP 由 Agent 调用\n  wanxiang doctor                   检查运行环境\n\n环境变量：\n  VIS_AGENT_BASE_URL / VIS_AGENT_API_KEY / VIS_AGENT_MODEL\n  VIS_MCP_SERVERS / WANXIANG_HOME / WANXIANG_PYTHON / WANXIANG_STYLE`);
+  console.log(`万相 Wanxiang · 陪伴学习与开放式可视化 Agent 服务\n\n用法：\n  wanxiang start [--port 8765]       启动 HTTP 服务\n  wanxiang companion [--port 8765]  启动快捷键框选与毛玻璃学习浮层\n  wanxiang companion --check        检查屏幕与输入权限\n  wanxiang mcp                      通过 stdio MCP 由 Agent 调用\n  wanxiang doctor                   检查运行环境\n\n环境变量：\n  VIS_AGENT_BASE_URL / VIS_AGENT_API_KEY / VIS_AGENT_MODEL\n  VIS_MCP_SERVERS / WANXIANG_HOME / WANXIANG_PYTHON / WANXIANG_STYLE`);
 }
 
 try {
@@ -90,7 +90,7 @@ try {
   } else if (command === "companion") {
     const portIndex = process.argv.indexOf("--port");
     const port = portIndex >= 0 ? process.argv[portIndex + 1] : process.env.PORT ?? "8765";
-    const args = ["-m", "app.companion", "--url", `http://127.0.0.1:${port}/v2/learning`, "--style", process.env.WANXIANG_STYLE ?? "textbook"];
+    const args = ["-m", "app.companion", "--url", `http://127.0.0.1:${port}/v2/learning`, "--style", process.env.WANXIANG_STYLE ?? "pixel"];
     if (process.argv.includes("--check")) args.push("--check");
     launch(args, true);
   } else if (command === "mcp") {

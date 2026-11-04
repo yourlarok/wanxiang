@@ -10,6 +10,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from .artifacts import Artifact, FormulaPayload, GraphPayload, HtmlPayload, Verification
+from .graph import render_graph
 from .plot import PlotSpec, render_plot
 from .scene import SceneSpec, render_scene
 from .styles import style_guide
@@ -74,7 +75,7 @@ class ToolRegistry:
             ),
             openai_tool(
                 "create_scene_artifact",
-                "以紧凑场景元素计划快速生成 SVG。模型只需给出文字、矩形、网格、圆、线和箭头及坐标，本地完成渲染。适合教学示意、结构嵌套、几何、流程直觉和函数草图。",
+                "用声明式 ArtScene 创建编辑式教学插图和轻量动效。除了文字、矩形、网格、圆、线和箭头，还支持 path、ellipse、polygon、曲线、图层、渐变、透明度、阴影与 enter/rise/draw/pulse/float 编排。先设计一个主视觉焦点，再用短标注解释，避免均分卡片。",
                 {**COMMON, "scene": scene_schema},
                 ["title", "explanation", "style", "scene", "evidence"],
             ),
@@ -86,7 +87,7 @@ class ToolRegistry:
             ),
             openai_tool(
                 "create_html_artifact",
-                "创建开放式教学微场景、SVG插图、几何模拟或交互实验。适合无法由普通关系图表达的概念。HTML body 不得包含 script、iframe、外部资源或事件属性；JavaScript 仅用于本地交互。",
+                "创建开放式互动艺术、教学微场景、SVG插图、几何模拟或交互实验。用主次分明的编辑式布局代替卡片堆叠，用按钮、滑块、逐步揭示或参数变化帮助理解。可复用内置 wx-* 布局、控件和动效类。HTML body 不得包含 script、iframe、外部资源或事件属性；JavaScript 仅用于本地交互。",
                 {
                     **COMMON,
                     "body": {"type": "string", "description": "内联HTML或SVG body"},
@@ -202,18 +203,21 @@ class ToolRegistry:
             )
             return ToolResult("开放 HTML 产物已创建并通过校验", verify_artifact(artifact))
         if name == "create_graph_artifact":
+            graph = GraphPayload.model_validate({"kind": arguments["kind"], "nodes": arguments["nodes"], "edges": arguments["edges"]})
+            body, css = render_graph(graph)
             artifact = Artifact(
                 artifact_type="graph",
                 title=arguments["title"],
                 explanation=arguments["explanation"],
                 style=arguments["style"],
-                graph=GraphPayload.model_validate({"kind": arguments["kind"], "nodes": arguments["nodes"], "edges": arguments["edges"]}),
+                graph=graph,
+                html=HtmlPayload(body=body, css=css, javascript=""),
                 evidence=arguments.get("evidence", []),
                 engine=self.engine,
                 tool=name,
                 verification=Verification(passed=False),
             )
-            return ToolResult("关系图产物已创建并通过校验", verify_artifact(artifact))
+            return ToolResult("关系图产物已渲染为 SVG 并通过校验", verify_artifact(artifact))
         if name == "create_formula_artifact":
             artifact = Artifact(
                 artifact_type="formula",

@@ -13,25 +13,36 @@ from .tools import ToolRegistry
 from .verifier import verify_artifact
 
 
-SYSTEM_PROMPT = """
+DESIGN_PROMPT = """
+先做视觉编排，再画图：每幅图只设一个主视觉焦点，占主要面积；标题、主图、注释形成明确层级，辅助信息沿网格对齐但不要堆成均分卡片。
+优先使用非对称留白、尺度对比、局部放大、引导线、曲线和前后图层，让构图由内容决定。最多三级文字，标签短而准确，不把说明段塞进图中。
+颜色以语义色为主，强调色只标当前重点。装饰必须帮助定位、分组或理解，不用无意义粒子、泛滥渐变和玻璃卡片。
+动效用于展示因果、状态或空间变化：入场使用 300–650ms 的非线性缓动，错峰总延迟不超过 400ms；同时运动的元素保持克制，不默认循环。
+互动必须改变可学习的视觉状态，例如切换视角、拖动参数、逐步揭示或比较状态；按钮和滑块要有明确文字，不能只让画面无目的地漂浮。
+""".strip()
+
+SYSTEM_PROMPT = f"""
 你是开放式可视化 Agent，不是场景分类器。你的任务是直接帮助用户理解问题。
 优先创建能直观解释的微场景、模拟、几何图、函数图或交互实验；只有真正的关系或流程才用关系图。
 数据、函数、空间结构和三维内容优先调用 create_plot_artifact，用声明式 PlotSpec 交给专业渲染器，不手写绘图代码。
 必须调用一个 create_*_artifact 工具完成产物，不要只输出文字回答。
 可先调用 get_style_guide 或外部 MCP 工具获取设计/计算能力，再创建产物。
 create_html_artifact 支持任意内联 HTML、SVG、CSS 和本地 JavaScript，因此未知领域也应自然生成，不得退回概念分类。
-HTML 不引用外部库、图片或字体，不使用 script/iframe/事件属性；JavaScript 只操作本地 SVG/Canvas/DOM，不访问网络、存储或宿主页面。
-图形要直接回答用户疑问，文字简明，避免把段落塞进节点。evidence 只记录原文依据，不编造事实。
+HTML 可复用 wx-artboard、wx-composition、wx-header、wx-main、wx-aside、wx-stage、wx-note、wx-toolbar、wx-control 等布局类，也可按内容自定义；body 不引用外部库、图片或字体，不使用 script/iframe/事件属性。
+JavaScript 只操作本地 SVG/Canvas/DOM，不访问网络、存储或宿主页面。
+{DESIGN_PROMPT}
+图形要直接回答用户疑问，evidence 只记录原文依据，不编造事实。
 """.strip()
 
-FAST_SYSTEM_PROMPT = """
-你是快速可视化规划器。只进行一次工具调用，不查询风格或外部工具，不解释工具过程。
+FAST_SYSTEM_PROMPT = f"""
+你是快速可视化规划器兼艺术指导。只进行一次工具调用，不查询风格或外部工具，不解释工具过程。
 数据、函数、几何、矩阵、张量、空间结构优先 create_plot_artifact，以紧凑声明式 PlotSpec 描述数据、视觉编码和多子图布局，由本地 Matplotlib 专业渲染。
 规则三维网格用 voxels：shape 给三个维度，coordinates 只给非默认单元，colors 配合 color_by 表达维度差异；不要逐图元摆平面矩形。
-简单自定义示意才用 create_scene_artifact；真正的实体关系或流程用 create_graph_artifact；纯公式解释用 create_formula_artifact。
+自定义教学插图用 create_scene_artifact，利用图层、路径、曲线、比例和短标注构成主视觉；互动实验或需要自由 SVG/Canvas 编排时用 create_html_artifact。
+真正的实体关系或流程用 create_graph_artifact；纯公式解释用 create_formula_artifact。
 同一问题的对比子图必须保持一致的图形类型、视角和视觉编码；3–4 个面板默认使用 2×2 均衡布局，不要横向挤成一排。
-颜色优先使用 accent、highlight、ink、muted 等语义色，使用户选择的主题统一生效。
-标签简短且准确，只输出回答问题所需的数据与视觉结构。
+{DESIGN_PROMPT}
+只输出回答问题所需的数据、视觉结构与紧凑代码。
 """.strip()
 
 LEARNING_SYSTEM_PROMPT = """
@@ -139,7 +150,7 @@ class VisualRuntime:
         if self.fast_mode:
             tools = [
                 tool for tool in tools
-                if tool["function"]["name"] in {"create_plot_artifact", "create_scene_artifact", "create_graph_artifact", "create_formula_artifact"}
+                if tool["function"]["name"] in {"create_plot_artifact", "create_scene_artifact", "create_html_artifact", "create_graph_artifact", "create_formula_artifact"}
             ]
         if learning:
             for tool in tools:
@@ -155,7 +166,7 @@ class VisualRuntime:
                     "messages": messages,
                     "tools": tools,
                     "tool_choice": "auto",
-                    "max_completion_tokens": 2500 if self.fast_mode else 7000,
+                    "max_completion_tokens": 4000 if self.fast_mode else 7000,
                     "reasoning_effort": self.planner_reasoning_effort if self.fast_mode else self.reasoning_effort,
                 }
                 model_started = time.perf_counter()

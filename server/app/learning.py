@@ -7,10 +7,10 @@ def learning_response(request: LearningRequest, artifact: Artifact) -> LearningR
     region = request.selection
     preferred = {
         "create_plot_artifact": (780, 570),
-        "create_scene_artifact": (700, 520),
+        "create_scene_artifact": (760, 560),
         "create_graph_artifact": (680, 500),
         "create_formula_artifact": (560, 330),
-        "create_html_artifact": (740, 560),
+        "create_html_artifact": (880, 650),
     }
     preferred_width, preferred_height = preferred.get(artifact.tool, (700, 520))
     if len(artifact.explanation) > 280:

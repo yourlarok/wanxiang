@@ -47,9 +47,10 @@ STYLE_GUIDES = {
     "pixel": {
         "background": "#17152b", "surface": "#272147", "ink": "#f5ead7", "muted": "#aaa1c7",
         "accent": "#ffd166", "highlight": "#58dfc0", "radius": "0px", "border_width": "2px",
-        "shadow": "4px 4px 0 #080711", "font": "'SFMono-Regular',Consolas,'PingFang SC','Microsoft YaHei',monospace",
-        "plot_family": "monospace", "plot_fonts": "SFMono-Regular,Consolas,PingFang SC,Microsoft YaHei,monospace",
-        "guidance": "复古像素风：深色街机配色、硬边方块、等宽字体和明确的高亮反馈，避免圆润现代卡片。",
+        "shadow": "4px 4px 0 #080711", "font": "'SFMono-Regular','Cascadia Mono',Menlo,Consolas,'PingFang SC','Microsoft YaHei',monospace",
+        "plot_family": "monospace", "plot_fonts": "SFMono-Regular,Cascadia Mono,Menlo,Consolas,PingFang SC,Microsoft YaHei,monospace",
+        "texture": "repeating-linear-gradient(0deg,#ffffff04 0,#ffffff04 1px,transparent 1px,transparent 4px)",
+        "guidance": "精致像素风：深色玻璃、可爱等宽字体、阶梯硬边、像素网格、硬阴影与明确高亮，所有图表保持几何精确。",
     },
     "watercolor": {
         "background": "#f5f1e8", "surface": "#fffdf8", "ink": "#38443f", "muted": "#78867e",
@@ -64,7 +65,21 @@ STYLE_GUIDES = {
 THEME_CSS = {
     "anime": ".style-anime .card{border-color:var(--ink)}.style-anime h1,.style-anime h2,.style-anime h3{letter-spacing:.02em}.style-anime button{border:2px solid var(--ink);border-radius:999px;box-shadow:2px 2px 0 var(--ink)}",
     "newspaper": ".style-newspaper body{padding:26px}.style-newspaper .card{border-width:0 0 1px;border-color:var(--ink);padding:20px 4px}.style-newspaper h1,.style-newspaper h2,.style-newspaper h3{line-height:1.25;letter-spacing:.025em}.style-newspaper h1{border-bottom:3px double var(--ink);padding-bottom:10px}",
-    "pixel": ".style-pixel .card{border-color:var(--ink)}.style-pixel h1,.style-pixel h2,.style-pixel h3{letter-spacing:.04em}.style-pixel button{border:2px solid var(--ink);border-radius:0;box-shadow:3px 3px 0 #080711}",
+    "pixel": """
+.style-pixel .card{border-color:var(--ink)}
+.style-pixel h1,.style-pixel h2,.style-pixel h3{letter-spacing:.04em;text-shadow:2px 2px 0 #080711}
+.style-pixel button{border:2px solid var(--ink);border-radius:0;box-shadow:3px 3px 0 #080711}
+.style-pixel .wx-stage,.style-pixel .plot{border:2px solid var(--muted);box-shadow:5px 5px 0 #080711}
+.style-pixel .wx-graph-card{stroke:var(--ink);stroke-width:2;filter:drop-shadow(4px 4px 0 #080711)}
+.style-pixel .wx-graph-badge{stroke:var(--ink);stroke-width:2}
+.style-pixel .wx-graph-number{fill:var(--ink)}
+.style-pixel .wx-graph-edge{stroke-width:3;stroke-dasharray:7 3;stroke-linecap:square;opacity:.9}
+.style-pixel .wx-graph-grid{stroke-width:1;opacity:.18}
+.style-pixel .wx-graph-meta{color:var(--highlight);font-weight:700}
+.style-pixel .wx-graph-description{fill:var(--ink);opacity:.76}
+.style-pixel svg,.style-pixel canvas{image-rendering:pixelated;shape-rendering:crispEdges}
+.style-pixel .wx-graph-label,.style-pixel .wx-graph-description{shape-rendering:geometricPrecision}
+""",
     "watercolor": ".style-watercolor .card{border-color:var(--muted);border-width:1px 2px 2px 1px}.style-watercolor h1,.style-watercolor h2,.style-watercolor h3{letter-spacing:.035em}",
 }
 
@@ -76,14 +91,17 @@ def style_guide(name: str) -> dict[str, str]:
 def style_shell(name: str, body: str, css: str, javascript: str) -> str:
     from string import Template
 
+    from .design import DESIGN_CSS, MOTION_JS
+
     style = style_guide(name)
     template = Template("""<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:">
 <style>
 :root{--bg:$background;--surface:$surface;--ink:$ink;--muted:$muted;--accent:$accent;--highlight:$highlight;--font:$font;--radius:$radius;--border-width:$border_width;--shadow:$shadow;--texture:$texture}
-*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);background-image:var(--texture);color:var(--ink);font-family:var(--font)}body{padding:18px;line-height:1.6}button,input{font:inherit}button{cursor:pointer}.card{background:var(--surface);border:var(--border-width) solid color-mix(in srgb,var(--muted) 45%,transparent);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}.accent{color:var(--accent)}.highlight{color:var(--highlight)}.muted{color:var(--muted)}$theme_css$css
-</style></head><body class="style-$name">$body<script>try{$javascript}catch(error){const notice=document.createElement('pre');notice.style.color='var(--highlight)';notice.textContent='交互运行失败：'+error.message;document.body.appendChild(notice)}</script></body></html>""")
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);background-image:var(--texture);color:var(--ink);font-family:var(--font)}body{padding:18px;line-height:1.6}button,input{font:inherit}button{cursor:pointer}.card{background:var(--surface);border:var(--border-width) solid color-mix(in srgb,var(--muted) 45%,transparent);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}.accent{color:var(--accent)}.highlight{color:var(--highlight)}.muted{color:var(--muted)}$design_css$theme_css$css
+</style></head><body class="style-$name">$body<script>try{$motion_js}catch(error){console.error(error)}</script><script>try{$javascript}catch(error){const notice=document.createElement('pre');notice.style.color='var(--highlight)';notice.textContent='交互运行失败：'+error.message;document.body.appendChild(notice)}</script></body></html>""")
     return template.safe_substitute(
-        **style, name=name, theme_css=THEME_CSS.get(name, ""), body=body, css=css, javascript=javascript,
+        **style, name=name, design_css=DESIGN_CSS, motion_js=MOTION_JS,
+        theme_css=THEME_CSS.get(name, ""), body=body, css=css, javascript=javascript,
     )

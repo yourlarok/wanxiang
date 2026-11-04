@@ -1,19 +1,20 @@
 # 万相 Wanxiang
 
-万相是一个由 Agent 驱动的开放式可视化后台服务。它把文本或截图转换为专业数据图、三维教学图、可交互微场景、SVG/HTML 视觉解释、关系图或公式产物。
+万相是一个由 Agent 驱动的陪伴学习与开放式可视化后台服务。它把文本或截图转换为专业数据图、三维教学图、可交互微场景、SVG/HTML 视觉解释、关系图或公式产物。
 
-万相不是桌面 App，也不依赖固定知识模板。通用大模型负责理解问题并生成紧凑的声明式 VizSpec，Matplotlib 等专业工具负责确定性渲染，MCP 提供扩展能力，Verifier 负责协议与安全校验。
+万相没有传统桌面主窗口，也不依赖固定知识模板。通用大模型负责理解问题并生成紧凑的声明式 VizSpec，Matplotlib 等专业工具负责确定性渲染，MCP 提供扩展能力，Verifier 负责协议与安全校验。
 
 ## 核心特点
 
+- **原地陪伴学习**：无主窗口 companion 支持全局右键框选、框外静态快照、按需上下文判断和毛玻璃学习浮层。
 - **声明式专业图表**：通用 PlotSpec 支持折线、散点、柱状、三维柱体、体素网格、曲面和最多 16 个子图；模型只提供数据与视觉编码，不提交可执行代码。
 - **开放产物**：支持 HTML、内联 SVG、CSS 和本地 JavaScript，不受固定知识领域限制。
 - **Agent 工具循环**：模型可以按需获取风格指南、调用外部 MCP 工具，再创建视觉产物。
 - **MCP 可扩展**：通过 `VIS_MCP_SERVERS` 动态发现其他 MCP 服务。
 - **风格与语义分离**：内置动漫、报刊、水彩、像素、教材、蓝图、极简和黑板八套风格，统一作用于 HTML、SVG 与 Matplotlib。
 - **安全沙箱**：默认禁止外部资源、网络请求、存储、内联事件和动态执行。
-- **两种使用方式**：HTTP 后台服务，或由 Agent 直接启动的 stdio MCP 服务。
-- **跨平台**：启动器支持 macOS 和 Windows，自动准备隔离 Python 环境。
+- **三种使用方式**：原地 companion、HTTP 后台服务，或由 Agent 直接启动的 stdio MCP 服务。
+- **跨平台**：启动器和 companion 按 macOS/Windows 设计，自动准备隔离 Python 环境。
 
 ## 工作原理
 
@@ -80,7 +81,27 @@ npx -y github:yourlarok/wanxiang doctor
 
 启动后访问 `http://127.0.0.1:8765/preview`。页面支持文本输入、风格选择以及模型、渲染和总耗时显示，开放 HTML 中的按钮与滑块可以直接操作。
 
-### 4. 速度与 JEV 配置
+### 4. 右键框选陪伴学习
+
+保持 HTTP 服务运行，再启动无主窗口 companion：
+
+```bash
+npx -y github:yourlarok/wanxiang companion
+```
+
+在任意页面或文档中**按住右键拖动框选**。松开后，浮层会在原位置附近展开，先检查框内内容，再由 Agent 判断是否需要框外上下文，最后按内容类型、解释长度和屏幕边界动态调整尺寸与布局。按 `Esc` 或右上角 `×` 关闭，不会打开传统应用主窗口。
+
+companion 默认每 5 秒读取一次当前屏幕的静态快照，只保存在内存，并在框选期间暂停更新。快照不会写入磁盘；但发起学习时，框选图片和用于判断的框外快照会随请求发送给本地服务，并由服务交给所配置的多模态模型。不要把此模式用于不允许上传到模型服务的敏感内容。
+
+macOS 首次使用需要允许屏幕录制，以及辅助功能或输入监控权限。可执行权限预检：
+
+```bash
+npx -y github:yourlarok/wanxiang companion --check
+```
+
+可通过 `WANXIANG_STYLE=anime` 等环境变量指定浮层与图表风格。companion 使用 Qt Essentials/Addons 和 pynput，不依赖 WebEngine。
+
+### 5. 速度与 JEV 配置
 
 默认快速路径只进行一次低强度模型规划，跳过外部 MCP 发现，并使用预热的本地 Matplotlib/SVG 渲染。数据与空间图形优先生成 PlotSpec，简单示意才使用六图元 SceneSpec：
 
@@ -101,7 +122,7 @@ export VIS_JEV_THRESHOLD=0.72
 
 高置信结果直接返回，低置信结果才升级完整 Agent。缓存命中时通常毫秒级返回；首次生成的速度仍主要取决于远程规划模型。Artifact 的 `timings_ms` 分别记录 `model`、`render` 和 `total`，用于区分推理与本地渲染瓶颈。
 
-### 5. 调用 HTTP API
+### 6. 调用 HTTP API
 
 ```bash
 curl http://127.0.0.1:8765/health
@@ -144,6 +165,8 @@ curl -X POST http://127.0.0.1:8765/v2/visualizations \
 ```
 
 不要给生成的 iframe 添加 `allow-same-origin`，也不要关闭其内容安全策略。
+
+陪伴学习使用 `POST /v2/learning`。请求在普通可视化字段之外支持 `context_image_base64`、`context_text`、`context_mode` 和 `selection`；响应包含 `artifact` 与 `overlay`。Artifact 中的 `context_used`、`context_reason` 记录模型是否真正使用框外信息，`overlay` 给出动态计算的全局位置和尺寸。
 
 ## 由 Agent 通过 MCP 使用
 
@@ -233,8 +256,9 @@ uvicorn app.main:app --host 127.0.0.1 --port 8765
 
 ## 当前限制
 
-- 复杂开放 HTML 的首次生成可能需要较长时间，取决于模型和工具调用次数。
-- 启动器按 Windows 与 macOS 设计；不同企业安全策略仍可能影响 MCP 子进程。
+- 复杂开放 HTML 与双图陪伴学习的首次生成可能需要较长时间，取决于模型、图片尺寸和工具调用次数；框外快照会在 companion 中缩放后传输。
+- macOS 使用 Quartz 截图并处理 Retina 像素比；Windows 使用 Qt 截图。右键监听、浮层与权限流程已在 macOS 实测，Windows 仍需在目标机器验证。
+- 启动器按 Windows 与 macOS 设计；不同企业安全策略仍可能影响全局输入监听和 MCP 子进程。
 - 外部 MCP 工具的质量、权限和可用性由各服务自身决定。
 
 ## License

@@ -12,7 +12,8 @@ from pydantic import ValidationError
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-from .artifacts import Artifact, VisualizationRequest
+from .artifacts import Artifact, LearningRequest, LearningResponse, VisualizationRequest
+from .learning import learning_response
 from .preview import PREVIEW_HTML
 from .runtime import RuntimeErrorBase, VisualRuntime
 
@@ -56,6 +57,17 @@ async def visualize(request: VisualizationRequest):
         raise HTTPException(status_code=502, detail=str(error)) from error
     except (httpx.HTTPError, ValidationError, ValueError) as error:
         raise HTTPException(status_code=502, detail="可视化服务暂时不可用") from error
+
+
+@app.post("/v2/learning", response_model=LearningResponse)
+async def learn(request: LearningRequest):
+    try:
+        artifact = await runtime.generate(request)
+        return learning_response(request, artifact)
+    except RuntimeErrorBase as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+    except (httpx.HTTPError, ValidationError, ValueError) as error:
+        raise HTTPException(status_code=502, detail="陪伴学习服务暂时不可用") from error
 
 
 if __name__ == "__main__":

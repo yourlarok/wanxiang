@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const serverDir = path.join(root, "server");
 const requirements = path.join(serverDir, "requirements.txt");
+const companionRequirements = path.join(serverDir, "companion-requirements.txt");
 const home = process.env.WANXIANG_HOME ?? path.join(os.homedir(), ".wanxiang");
 const windows = process.platform === "win32";
 const python = path.join(home, ".venv", windows ? "Scripts" : "bin", windows ? "python.exe" : "python");
@@ -26,7 +27,7 @@ function runSetup(args) {
   }
 }
 
-function ensurePython() {
+function ensurePython(withCompanion = false) {
   mkdirSync(home, { recursive: true });
   if (!existsSync(python)) {
     const candidates = process.env.WANXIANG_PYTHON ? [process.env.WANXIANG_PYTHON] : windows ? ["python", "py"] : ["python3", "python"];
@@ -48,10 +49,18 @@ function ensurePython() {
     runSetup({ command: python, args: ["-m", "pip", "install", "-r", requirements] });
     writeFileSync(stamp, digest);
   }
+  if (withCompanion) {
+    const companionStamp = path.join(home, ".companion-requirements-sha256");
+    const companionDigest = createHash("sha256").update(readFileSync(companionRequirements)).digest("hex");
+    if (!existsSync(companionStamp) || readFileSync(companionStamp, "utf8") !== companionDigest) {
+      runSetup({ command: python, args: ["-m", "pip", "install", "-r", companionRequirements] });
+      writeFileSync(companionStamp, companionDigest);
+    }
+  }
 }
 
-function launch(args) {
-  ensurePython();
+function launch(args, withCompanion = false) {
+  ensurePython(withCompanion);
   const child = spawn(python, args, {
     cwd: serverDir,
     env: process.env,
@@ -70,7 +79,7 @@ function launch(args) {
 }
 
 function help() {
-  console.log(`万相 Wanxiang · 开放式可视化 Agent 服务\n\n用法：\n  wanxiang start [--port 8765]  启动 HTTP 服务\n  wanxiang mcp                 通过 stdio MCP 由 Agent 调用\n  wanxiang doctor              检查运行环境\n\n环境变量：\n  VIS_AGENT_BASE_URL / VIS_AGENT_API_KEY / VIS_AGENT_MODEL\n  VIS_MCP_SERVERS / WANXIANG_HOME / WANXIANG_PYTHON`);
+  console.log(`万相 Wanxiang · 陪伴学习与开放式可视化 Agent 服务\n\n用法：\n  wanxiang start [--port 8765]       启动 HTTP 服务\n  wanxiang companion [--port 8765]  启动右键框选与毛玻璃学习浮层\n  wanxiang companion --check        检查屏幕与输入权限\n  wanxiang mcp                      通过 stdio MCP 由 Agent 调用\n  wanxiang doctor                   检查运行环境\n\n环境变量：\n  VIS_AGENT_BASE_URL / VIS_AGENT_API_KEY / VIS_AGENT_MODEL\n  VIS_MCP_SERVERS / WANXIANG_HOME / WANXIANG_PYTHON / WANXIANG_STYLE`);
 }
 
 try {
@@ -78,6 +87,12 @@ try {
     const portIndex = process.argv.indexOf("--port");
     const port = portIndex >= 0 ? process.argv[portIndex + 1] : process.env.PORT ?? "8765";
     launch(["-m", "uvicorn", "app.main:app", "--host", process.env.HOST ?? "127.0.0.1", "--port", port]);
+  } else if (command === "companion") {
+    const portIndex = process.argv.indexOf("--port");
+    const port = portIndex >= 0 ? process.argv[portIndex + 1] : process.env.PORT ?? "8765";
+    const args = ["-m", "app.companion", "--url", `http://127.0.0.1:${port}/v2/learning`, "--style", process.env.WANXIANG_STYLE ?? "textbook"];
+    if (process.argv.includes("--check")) args.push("--check");
+    launch(args, true);
   } else if (command === "mcp") {
     launch(["-m", "app.mcp_server"]);
   } else if (command === "doctor") {

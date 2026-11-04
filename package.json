@@ -18,6 +18,7 @@
     "bin/",
     "server/app/",
     "server/requirements.txt",
+    "server/companion-requirements.txt",
     ".env.example",
     "README.md"
   ],

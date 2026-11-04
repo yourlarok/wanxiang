@@ -16,6 +16,25 @@ class VisualizationRequest(BaseModel):
         return self
 
 
+class SelectionRegion(BaseModel):
+    x: int
+    y: int
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)
+    screen_width: int = Field(gt=0)
+    screen_height: int = Field(gt=0)
+    screen_x: int = 0
+    screen_y: int = 0
+
+
+class LearningRequest(VisualizationRequest):
+    context_image_base64: str | None = Field(default=None, max_length=20_000_000)
+    context_text: str | None = Field(default=None, max_length=100_000)
+    context_mode: Literal["auto", "always", "never"] = "auto"
+    selection: SelectionRegion | None = None
+    source: str = Field(default="screen", max_length=120)
+
+
 class VisualNode(BaseModel):
     id: str = Field(min_length=1, max_length=64)
     label: str = Field(min_length=1, max_length=120)
@@ -73,6 +92,8 @@ class Artifact(BaseModel):
     tool: str
     verification: Verification
     timings_ms: dict[str, float] = Field(default_factory=dict)
+    context_used: bool | None = None
+    context_reason: str = Field(default="", max_length=300)
 
     @model_validator(mode="after")
     def validate_payload(self):
@@ -90,3 +111,15 @@ class Artifact(BaseModel):
             if any(edge.source not in node_ids or edge.target not in node_ids for edge in self.graph.edges):
                 raise ValueError("边引用了不存在的节点")
         return self
+
+
+class OverlayLayout(BaseModel):
+    x: int
+    y: int
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)
+
+
+class LearningResponse(BaseModel):
+    artifact: Artifact
+    overlay: OverlayLayout

@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from .artifacts import Artifact, HtmlPayload, Verification, VisualizationRequest
+from .artifacts import Artifact, HtmlPayload, LearningRequest, Verification, VisualizationRequest
 from .decision import JevEngine
 from .tools import ToolRegistry
 from .verifier import verify_artifact
@@ -32,6 +32,13 @@ FAST_SYSTEM_PROMPT = """
 同一问题的对比子图必须保持一致的图形类型、视角和视觉编码；3–4 个面板默认使用 2×2 均衡布局，不要横向挤成一排。
 颜色优先使用 accent、highlight、ink、muted 等语义色，使用户选择的主题统一生效。
 标签简短且准确，只输出回答问题所需的数据与视觉结构。
+""".strip()
+
+LEARNING_SYSTEM_PROMPT = """
+这是陪伴学习场景。第一张图片是用户框选的重点，第二张图片（若有）是此前常态读取的框外静态快照。
+先理解框内内容，再判断它是否依赖框外定义、前文、图表或题目条件；只在确有需要时结合背景，不引入无关内容。
+每次创建产物都必须填写 context_used 和 context_reason：明确是否真正使用了框外上下文以及简短原因。
+解释应帮助用户继续学习：先解除当前疑惑，再给一个贴切例子或必要下一步，避免泛泛总结整张屏幕。
 """.strip()
 
 
@@ -103,17 +110,29 @@ class VisualRuntime:
     async def _model_artifact(self, request: VisualizationRequest) -> Artifact:
         started = time.perf_counter()
         model_ms = 0.0
+        learning = isinstance(request, LearningRequest)
         content: list[dict[str, Any]] = [{
             "type": "text",
-            "text": f"表达偏好：{request.preference}\n视觉风格：{request.style}\n用户内容：{request.text or '识别截图并选择最有助于理解的视觉表达'}",
+            "text": f"表达偏好：{request.preference}\n视觉风格：{request.style}\n用户内容：{request.text or '识别框选截图并选择最有助于理解的视觉表达'}",
         }]
+
+        def append_image(target: list[dict[str, Any]], value: str) -> None:
+            image = value if value.startswith("data:image/") else f"data:image/png;base64,{value}"
+            target.append({"type": "image_url", "image_url": {"url": image}})
+
         if request.image_base64:
-            image = request.image_base64
-            if not image.startswith("data:image/"):
-                image = f"data:image/png;base64,{image}"
-            content.append({"type": "image_url", "image_url": {"url": image}})
+            append_image(content, request.image_base64)
+        if learning and request.context_mode != "never":
+            if request.context_text:
+                content.append({"type": "text", "text": f"可选框外文字上下文：\n{request.context_text}"})
+            if request.context_image_base64:
+                content.append({"type": "text", "text": "以下是框外静态快照，仅在当前疑惑需要时参考："})
+                append_image(content, request.context_image_base64)
+        system_prompt = FAST_SYSTEM_PROMPT if self.fast_mode else SYSTEM_PROMPT
+        if learning:
+            system_prompt = f"{LEARNING_SYSTEM_PROMPT}\n{system_prompt}"
         messages: list[dict[str, Any]] = [
-            {"role": "system", "content": FAST_SYSTEM_PROMPT if self.fast_mode else SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": content},
         ]
         tools = self.registry.builtin_tools() if self.fast_mode else await self.registry.tools()
@@ -122,6 +141,12 @@ class VisualRuntime:
                 tool for tool in tools
                 if tool["function"]["name"] in {"create_plot_artifact", "create_scene_artifact", "create_graph_artifact", "create_formula_artifact"}
             ]
+        if learning:
+            for tool in tools:
+                parameters = tool["function"]["parameters"]
+                parameters["properties"]["context_used"] = {"type": "boolean", "description": "是否真正使用了框外上下文"}
+                parameters["properties"]["context_reason"] = {"type": "string", "description": "上下文判断的简短原因"}
+                parameters["required"] = [*parameters["required"], "context_used", "context_reason"]
 
         async with httpx.AsyncClient(timeout=120) as client:
             for _ in range(5):
@@ -158,6 +183,9 @@ class VisualRuntime:
                         if result.artifact:
                             result.artifact.timings_ms["model"] = model_ms
                             result.artifact.timings_ms["total"] = (time.perf_counter() - started) * 1000
+                            if learning:
+                                result.artifact.context_used = arguments.get("context_used")
+                                result.artifact.context_reason = arguments.get("context_reason", "")
                             return result.artifact
                         tool_content = result.content
                     except (ValueError, KeyError, TypeError) as error:
